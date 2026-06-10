@@ -17,12 +17,12 @@ class LLMClient:
         
         self.primary_model = self.llm_config.get("primary_model", "google/gemini-2.5-flash")
         self.fallback_models = self.llm_config.get("fallback_models", [
-            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "google/gemini-2.5-flash:free",
             "meta-llama/llama-3.3-70b-instruct:free"
         ])
         self.model_list = [self.primary_model] + self.fallback_models
         
-        self.max_output_tokens = self.llm_config.get("max_output_tokens", 8192)
+        self.max_output_tokens = self.llm_config.get("max_output_tokens", 4000)
         self.retries = self.llm_config.get("retries", 3)
         self.retry_backoff = self.llm_config.get("retry_backoff", 2.0)
         
