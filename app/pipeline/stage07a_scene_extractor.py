@@ -31,7 +31,20 @@ class Stage07aSceneExtractor:
                 "You are an expert Manhwa Scriptwriter. Convert the following novel text into a sequential array of video scenes.\n"
                 "CRITICAL INSTRUCTION: Do NOT skip any dialogue or story events. The extracted text MUST cover >= 95% of the original chunk.\n"
                 "Target pacing: 1 scene every 4-8 seconds.\n"
-                "Return a JSON list of Scene objects."
+                "Return a JSON list of Scene objects. Each Scene object MUST strictly adhere to this exact schema:\n"
+                "{\n"
+                '  "scene_id": <int>,\n'
+                '  "chapter": "<string>",\n'
+                '  "chunk": <int>,\n'
+                '  "narration": "<string: exact text from the novel>",\n'
+                '  "tts_text": "<string: text to be spoken by TTS>",\n'
+                '  "word_count": <int: number of words in narration>,\n'
+                '  "characters": ["<string>"],\n'
+                '  "location": "<string>",\n'
+                '  "emotion": "<string>",\n'
+                '  "camera": "<string>",\n'
+                '  "image_prompt": "<string>"\n'
+                "}\n"
             )
             
             try:
