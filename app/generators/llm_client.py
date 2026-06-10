@@ -10,8 +10,15 @@ class LLMClient:
         config = load_config()
         llm_config = config.get("llm", {})
         self.provider = llm_config.get("provider", "groq").lower()
-        self.model_name = llm_config.get("model", "llama-3.1-8b-instant")
         
+        self.fallback_models = [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "mixtral-8x7b-32768",
+            "gemma2-9b-it"
+        ]
+        self.model_idx = 0
+        self.model_name = self.fallback_models[self.model_idx]
         if self.provider == "groq":
             api_key = os.environ.get("GROQ_API_KEY")
             base_url = "https://api.groq.com/openai/v1"
@@ -76,7 +83,7 @@ class LLMClient:
                         {"role": "user", "content": full_prompt}
                     ],
                     temperature=0.1,
-                    max_tokens=3000,
+                    max_tokens=1500,
                     response_format={"type": "json_object"}
                 )
                 
@@ -93,6 +100,13 @@ class LLMClient:
                 
                 if attempt == retries - 1:
                     raise
+                    
+                if "413" in error_str or "429" in error_str or "rate_limit" in error_str:
+                    self.model_idx = (self.model_idx + 1) % len(self.fallback_models)
+                    self.model_name = self.fallback_models[self.model_idx]
+                    logger.warning(f"Groq Limit Hit! Auto-switching to model: {self.model_name}...")
+                    time.sleep(2) # brief pause before jumping to next model
+                    continue
                     
                 import re
                 match = re.search(r'(?:try again in|retry in) ([\d.]+)s', error_str, re.IGNORECASE)
