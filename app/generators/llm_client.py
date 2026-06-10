@@ -51,10 +51,13 @@ class LLMClient:
             if "Scene" in prompt or "scene" in prompt:
                 words = text.split()
                 scenes = []
-                chunk_len = len(words) // 4
-                for i in range(4):
-                    if chunk_len == 0: break
+                chunk_len = 60
+                num_scenes = len(words) // chunk_len + (1 if len(words) % chunk_len != 0 else 0)
+                
+                for i in range(num_scenes):
                     narration = " ".join(words[i*chunk_len:(i+1)*chunk_len])
+                    if not narration.strip():
+                        continue
                     scenes.append({
                         "scene_id": i+1,
                         "chapter": "1",
