@@ -12,7 +12,6 @@ class LLMClient:
         self.provider = llm_config.get("provider", "openrouter").lower()
         
         self.fallback_models = [
-            "google/gemini-2.0-flash-lite-preview-02-05:free",
             "google/gemini-2.0-flash-exp:free",
             "meta-llama/llama-3.3-70b-instruct:free",
             "mistralai/mistral-nemo:free"
@@ -101,10 +100,10 @@ class LLMClient:
                 if attempt == retries - 1:
                     raise
                     
-                if "413" in error_str or "429" in error_str or "rate_limit" in error_str:
+                if "413" in error_str or "429" in error_str or "rate_limit" in error_str or "400" in error_str or "404" in error_str:
                     self.model_idx = (self.model_idx + 1) % len(self.fallback_models)
                     self.model_name = self.fallback_models[self.model_idx]
-                    logger.warning(f"Groq Limit Hit! Auto-switching to model: {self.model_name}...")
+                    logger.warning(f"Limit or Error Hit! Auto-switching to model: {self.model_name}...")
                     time.sleep(2) # brief pause before jumping to next model
                     continue
                     
