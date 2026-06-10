@@ -16,7 +16,7 @@ class GeminiClient:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel(self.model_name)
         
-    def generate_json(self, prompt: str, text: str, retries: int = 3) -> str:
+    def generate_json(self, prompt: str, text: str, retries: int = 5) -> str:
         """
         Calls Gemini to generate a JSON output based on the provided prompt and text.
         Includes exponential backoff for rate limits.
@@ -67,7 +67,19 @@ class GeminiClient:
                 )
                 return response.text
             except Exception as e:
-                logger.error(f"Gemini API Error (Attempt {attempt+1}/{retries}): {str(e)}")
+                error_str = str(e)
+                logger.error(f"Gemini API Error (Attempt {attempt+1}/{retries}): {error_str}")
                 if attempt == retries - 1:
                     raise
-                time.sleep(2 ** attempt)
+                
+                import re
+                match = re.search(r'Please retry in ([\d.]+)s', error_str)
+                if match:
+                    wait_time = float(match.group(1)) + 2.0
+                    logger.warning(f"Rate limit hit. Sleeping {wait_time:.1f} seconds...")
+                    time.sleep(wait_time)
+                elif "429" in error_str or "Quota exceeded" in error_str:
+                    logger.warning("Rate limit hit. Sleeping 60 seconds...")
+                    time.sleep(60)
+                else:
+                    time.sleep(10 * (attempt + 1))
