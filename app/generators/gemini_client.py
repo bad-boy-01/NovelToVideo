@@ -83,7 +83,7 @@ class GeminiClient:
                 logger.error(f"Gemini API Error (Model: {self.model_name}, Attempt {attempt+1}/{retries}): {error_str}")
                 
                 # Auto-healing router for missing models or daily hard limits
-                if "404" in error_str or "not found" in error_str or ("429" in error_str and "limit: 20" in error_str) or "Invalid argument: response_mime_type" in error_str:
+                if "404" in error_str or "not found" in error_str or ("429" in error_str and ("limit: 20" in error_str or "limit: 0" in error_str)) or "Invalid argument: response_mime_type" in error_str:
                     self.current_model_idx += 1
                     if self.current_model_idx < len(self.fallback_models):
                         self.model_name = self.fallback_models[self.current_model_idx]
