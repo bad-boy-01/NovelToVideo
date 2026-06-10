@@ -12,9 +12,9 @@ class LLMClient:
         self.provider = llm_config.get("provider", "openrouter").lower()
         
         self.fallback_models = [
-            "google/gemini-2.0-flash:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "mistralai/mistral-nemo:free"
+            "openrouter/free",
+            "google/gemma-3-27b-it:free",
+            "deepseek/deepseek-chat-v3-0324:free"
         ]
         self.model_idx = 0
         self.model_name = llm_config.get("model", self.fallback_models[self.model_idx])
