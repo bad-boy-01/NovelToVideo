@@ -25,7 +25,7 @@ class LLMClient:
         if not api_key:
             logger.warning(f"{self.provider.upper()}_API_KEY environment variable is not set. API calls will fail.")
             
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.client = OpenAI(api_key=api_key or "mock_key", base_url=base_url)
         
     def generate_json(self, prompt: str, text: str, retries: int = 5) -> str:
         """
