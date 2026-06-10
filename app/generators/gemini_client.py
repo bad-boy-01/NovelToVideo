@@ -7,7 +7,19 @@ from app.utils.logger import logger
 class GeminiClient:
     def __init__(self):
         config = load_config()
-        self.model_name = config.get("gemini", {}).get("model", "gemini-2.5-flash")
+        primary_model = config.get("gemini", {}).get("model", "gemini-1.5-flash")
+        
+        self.fallback_models = [
+            primary_model,
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-1.5-flash-002",
+            "gemini-1.5-pro",
+            "gemini-2.5-flash"
+        ]
+        self.fallback_models = list(dict.fromkeys(self.fallback_models))
+        self.current_model_idx = 0
+        self.model_name = self.fallback_models[self.current_model_idx]
         
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
@@ -68,7 +80,17 @@ class GeminiClient:
                 return response.text
             except Exception as e:
                 error_str = str(e)
-                logger.error(f"Gemini API Error (Attempt {attempt+1}/{retries}): {error_str}")
+                logger.error(f"Gemini API Error (Model: {self.model_name}, Attempt {attempt+1}/{retries}): {error_str}")
+                
+                # Auto-healing router for missing models or daily hard limits
+                if "404" in error_str or "not found" in error_str or ("429" in error_str and "limit: 20" in error_str) or "Invalid argument: response_mime_type" in error_str:
+                    self.current_model_idx += 1
+                    if self.current_model_idx < len(self.fallback_models):
+                        self.model_name = self.fallback_models[self.current_model_idx]
+                        self.model = genai.GenerativeModel(self.model_name)
+                        logger.warning(f"Auto-switching to fallback model: {self.model_name}")
+                        continue
+                
                 if attempt == retries - 1:
                     raise
                 
