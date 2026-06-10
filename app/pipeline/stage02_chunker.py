@@ -40,8 +40,12 @@ class SmartChunker:
         return True
 
     def chunk_text(self, text: str) -> List[str]:
-        # Split by double newline preserving single newlines
-        paragraphs = re.split(r'\n\s*\n', text)
+        # Split by any number of newlines to handle both single and double newline scripts
+        paragraphs = [p.strip() for p in re.split(r'\n+', text) if p.strip()]
+        
+        # If the entire novel has zero newlines, split by punctuation
+        if len(paragraphs) == 1 and self.get_word_count(paragraphs[0]) > self.max_words:
+            paragraphs = [p.strip() for p in re.split(r'(?<=[.!?])\s+', text) if p.strip()]
         chunks = []
         current_chunk = []
         current_words = 0
