@@ -9,16 +9,16 @@ class LLMClient:
     def __init__(self):
         config = load_config()
         llm_config = config.get("llm", {})
-        self.provider = llm_config.get("provider", "groq").lower()
+        self.provider = llm_config.get("provider", "openrouter").lower()
         
         self.fallback_models = [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "mixtral-8x7b-32768",
-            "gemma2-9b-it"
+            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "google/gemini-2.0-flash-exp:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "mistralai/mistral-nemo:free"
         ]
         self.model_idx = 0
-        self.model_name = self.fallback_models[self.model_idx]
+        self.model_name = llm_config.get("model", self.fallback_models[self.model_idx])
         if self.provider == "groq":
             api_key = os.environ.get("GROQ_API_KEY")
             base_url = "https://api.groq.com/openai/v1"

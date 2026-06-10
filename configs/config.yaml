@@ -29,5 +29,5 @@ tts:
   provider: kokoro
 
 llm:
-  provider: groq
-  model: llama-3.1-8b-instant
+  provider: openrouter
+  model: google/gemini-2.0-flash-lite-preview-02-05:free
