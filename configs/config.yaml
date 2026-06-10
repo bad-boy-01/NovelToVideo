@@ -31,8 +31,9 @@ tts:
 llm:
   primary_model: "google/gemini-2.5-flash"
   fallback_models:
-    - "meta-llama/llama-3.3-70b-instruct:free"
-    - "qwen/qwen3-coder:free"
-  max_output_tokens: 3000
+    - "google/gemma-2-9b-it:free"
+    - "meta-llama/llama-3-8b-instruct:free"
+    - "meta-llama/llama-3.1-8b-instruct:free"
+  max_output_tokens: 3600
   retries: 3
   retry_backoff: 2.0
