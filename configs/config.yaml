@@ -32,6 +32,7 @@ llm:
   primary_model: "google/gemini-2.5-flash"
   fallback_models:
     - "meta-llama/llama-3.3-70b-instruct:free"
+    - "qwen/qwen3-coder:free"
   max_output_tokens: 3000
   retries: 3
   retry_backoff: 2.0
