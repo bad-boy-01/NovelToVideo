@@ -94,11 +94,16 @@ def run_pipeline(project_name: str, resume: bool = False):
         Stage17GlobalMemory(project_path),
     ]
     
+    pipeline_success = True
+    failed_stage = None
+
     for i, stage in enumerate(stages):
         logger.info(f"Executing Stage {i+1}/{len(stages)}: {stage.__class__.__name__}")
         try:
             stage.run()
         except Exception as e:
+            pipeline_success = False
+            failed_stage = stage.__class__.__name__
             logger.error(f"CRITICAL: Pipeline halted at {stage.__class__.__name__}. Error: {e}")
             if not resume:
                 raise
@@ -113,6 +118,8 @@ def run_pipeline(project_name: str, resume: bool = False):
     
     # Report Generation
     report = {
+        "status": "success" if pipeline_success else "failed",
+        "failed_stage": failed_stage,
         "total_words": 250000,
         "chunks": 35,
         "scenes": 1274,
@@ -123,10 +130,15 @@ def run_pipeline(project_name: str, resume: bool = False):
         "success_rate": 96.7
     }
     
-    with open(project_path / "report.json", "w", encoding="utf-8") as f:
+    with open(project_path / "project_manifest.json", "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
         
-    logger.info("Pipeline completed successfully! Production Report Generated at report.json")
+    if pipeline_success:
+        logger.info("Pipeline completed successfully! Production Report Generated at project_manifest.json")
+        sys.exit(0)
+    else:
+        logger.error(f"Pipeline FAILED at {failed_stage}.")
+        sys.exit(1)
 
 def run_batch():
     projects_dir = Path("projects")

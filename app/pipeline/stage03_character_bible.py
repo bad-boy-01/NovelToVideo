@@ -47,27 +47,37 @@ class Stage03CharacterBible:
                 base_prompt + "\n\n"
                 "Return a JSON dictionary where keys are character canonical names and values are the CharacterRegistryEntry objects.\n"
                 f"Current Registry State:\n{json.dumps(current_registry, indent=2)}\n\n"
-                "INSTRUCTIONS:\n"
-                "1. If a character already exists, ONLY update their fingerprint if the new chunk explicitly provides clearer details. Rate your confidence in this change via 'fingerprint_confidence' (0.0 to 1.0).\n"
-                "2. If 'fingerprint_confidence' < 0.9, set 'needs_review' to true and DO NOT overwrite their main fingerprint.\n"
-                "3. If a character experiences a time-skip or major appearance change in this chunk, ADD a new CharacterVersion to their 'versions' array.\n"
-                "4. If a completely new character appears in this chunk, CREATE a new entry for them.\n"
-                "5. Make sure to return the full, merged registry including all previous characters, even if they didn't appear in this chunk."
+                "INSTRUCTIONS FOR INCREMENTAL DELTA:\n"
+                "1. ONLY output characters that are EITHER newly discovered in this chunk, OR existing characters whose physical descriptions/fingerprints need an update based on new details in this chunk.\n"
+                "2. DO NOT output characters from the 'Current Registry State' if they do not appear in this chunk or have no new descriptive details.\n"
+                "3. If a character already exists and requires an update, rate your confidence in this change via 'fingerprint_confidence' (0.0 to 1.0).\n"
+                "4. If 'fingerprint_confidence' < 0.9, set 'needs_review' to true and DO NOT overwrite their main fingerprint.\n"
+                "5. If a character experiences a time-skip or major appearance change in this chunk, ADD a new CharacterVersion to their 'versions' array.\n"
+                "6. If a completely new character appears in this chunk, CREATE a new entry for them.\n"
             )
             
             result_text = self.llm.generate_json(prompt, chunk_text)
             try:
                 updated_registry = self._clean_json_response(result_text)
                 
-                # Apply Confidence Lock
+                # Apply Confidence Lock & Merge Delta Locally
                 for char_id, entry in updated_registry.items():
-                    confidence = entry.get("fingerprint_confidence", 1.0)
-                    if confidence < 0.9:
-                        entry["needs_review"] = True
-                        if char_id in current_registry:
-                            entry["fingerprint"] = current_registry[char_id].get("fingerprint")
+                    if char_id in current_registry:
+                        existing = current_registry[char_id]
+                        
+                        confidence = entry.get("fingerprint_confidence", 1.0)
+                        if confidence < 0.9:
+                            entry["needs_review"] = True
+                            entry["fingerprint"] = existing.get("fingerprint")
                             
-                current_registry = updated_registry
+                        # Safely merge versions
+                        old_versions = existing.get("versions", {})
+                        old_versions.update(entry.get("versions", {}))
+                        entry["versions"] = old_versions
+                        
+                        current_registry[char_id] = entry
+                    else:
+                        current_registry[char_id] = entry
                 
                 # Iteratively save progress
                 with open(self.registry_path, "w", encoding="utf-8") as f:

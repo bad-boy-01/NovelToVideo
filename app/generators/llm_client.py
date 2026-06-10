@@ -4,43 +4,43 @@ import json
 from openai import OpenAI
 from app.utils.config import load_config
 from app.utils.logger import logger
+from json_repair import repair_json
+
+class TruncationError(Exception):
+    """Custom exception for hard token limits."""
+    pass
 
 class LLMClient:
     def __init__(self):
-        config = load_config()
-        llm_config = config.get("llm", {})
-        self.provider = llm_config.get("provider", "openrouter").lower()
+        self.config = load_config()
+        self.llm_config = self.config.get("llm", {})
         
-        self.fallback_models = [
-            "meta-llama/llama-4-scout:free",
-            "deepseek/deepseek-r1:free",
-            "qwen/qwen3-235b-a22b:free",
-            "google/gemma-3-27b-it:free"
-        ]
-        self.model_idx = 0
-        self.model_name = llm_config.get("model", self.fallback_models[self.model_idx])
-        if self.provider == "groq":
-            api_key = os.environ.get("GROQ_API_KEY")
-            base_url = "https://api.groq.com/openai/v1"
-        elif self.provider == "openrouter":
-            api_key = os.environ.get("OPENROUTER_API_KEY")
-            base_url = "https://openrouter.ai/api/v1"
-        else: # default openai
-            api_key = os.environ.get("OPENAI_API_KEY")
-            base_url = "https://api.openai.com/v1"
+        self.primary_model = self.llm_config.get("primary_model", "google/gemini-2.5-flash")
+        self.fallback_models = self.llm_config.get("fallback_models", [
+            "google/gemini-2.0-flash-lite-preview-02-05:free",
+            "meta-llama/llama-3.3-70b-instruct:free"
+        ])
+        self.model_list = [self.primary_model] + self.fallback_models
+        
+        self.max_output_tokens = self.llm_config.get("max_output_tokens", 8192)
+        self.retries = self.llm_config.get("retries", 3)
+        self.retry_backoff = self.llm_config.get("retry_backoff", 2.0)
+        
+        # Hardcoding to OpenRouter as per the migration
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        base_url = "https://openrouter.ai/api/v1"
 
         if not api_key:
-            logger.warning(f"{self.provider.upper()}_API_KEY environment variable is not set. API calls will fail.")
+            logger.warning("OPENROUTER_API_KEY environment variable is not set. API calls will fail.")
             
         self.client = OpenAI(api_key=api_key or "mock_key", base_url=base_url)
         
-    def generate_json(self, prompt: str, text: str, retries: int = 5) -> str:
+    def generate_json(self, prompt: str, text: str) -> str:
         """
         Calls the LLM to generate a JSON output based on the provided prompt and text.
-        Includes exponential backoff for rate limits.
+        Includes fast-fail for token truncations, json-repair, and fallback routing.
         """
-        if not os.environ.get(f"{self.provider.upper()}_API_KEY"):
-            import json
+        if not os.environ.get("OPENROUTER_API_KEY"):
             logger.warning("MOCK MODE: Returning dummy JSON to bypass validators.")
             if "Character" in prompt or "CharacterRegistryEntry" in prompt or "Registry" in prompt:
                 return '{"Xu Changshou": {"aliases": ["Changshou"], "canonical_name": "Xu Changshou", "fingerprint": "black hair, black coat", "versions": {}, "fingerprint_confidence": 0.95, "needs_review": false}}'
@@ -51,7 +51,6 @@ class LLMClient:
             if "Scene" in prompt or "scene" in prompt:
                 words = text.split()
                 scenes = []
-                # Ensure we generate ~45 words per scene to bypass Density Validators
                 chunk_len = len(words) // 4
                 for i in range(4):
                     if chunk_len == 0: break
@@ -74,63 +73,66 @@ class LLMClient:
 
         full_prompt = f"{prompt}\n\n--- SOURCE TEXT ---\n{text}\n--- END SOURCE TEXT ---"
         
-        for attempt in range(retries):
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": "You are a precise data extraction system. You must output raw, valid JSON only. Do not wrap in markdown blocks like ```json."},
-                        {"role": "user", "content": full_prompt}
-                    ],
-                    temperature=0.1,
-                    response_format={"type": "json_object"}
-                )
-                
-                content = response.choices[0].message.content
-                
-                if content is None:
-                    raise ValueError("The model returned a blank response due to rate limits.")
-                    
-                if content.startswith("```json"):
-                    content = content[7:]
-                if content.endswith("```"):
-                    content = content[:-3]
-                    
-                content = content.strip()
-                
-                # Verify JSON is complete before returning
-                import json
+        for model in self.model_list:
+            logger.info(f"Attempting JSON generation with {model}...")
+            
+            for attempt in range(self.retries):
                 try:
-                    json.loads(content)
-                except json.JSONDecodeError:
-                    raise ValueError("The model generated incomplete JSON (truncated response).")
+                    response = self.client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": "You are a precise data extraction system. You must output raw, valid JSON only. Do not wrap in markdown blocks like ```json."},
+                            {"role": "user", "content": full_prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=self.max_output_tokens,
+                        response_format={"type": "json_object"}
+                    )
                     
-                return content
-                
-            except Exception as e:
-                error_str = str(e)
-                logger.error(f"LLM API Error (Model: {self.model_name}, Attempt {attempt+1}/{retries}): {error_str}")
-                
-                if attempt == retries - 1:
-                    raise
+                    # Fast-Fail Check: Did the model hit a hard token wall?
+                    finish_reason = response.choices[0].finish_reason
+                    if finish_reason in ["length", "max_tokens"]:
+                        raise TruncationError(f"The model hit its output token limit ({self.max_output_tokens}).")
+                        
+                    content = response.choices[0].message.content
+                    if content is None:
+                        raise TruncationError("The model returned a blank response due to rate limits.")
+                        
+                    if content.startswith("```json"):
+                        content = content[7:]
+                    if content.endswith("```"):
+                        content = content[:-3]
+                    content = content.strip()
                     
-                if "413" in error_str or "429" in error_str or "rate_limit" in error_str or "400" in error_str or "404" in error_str:
-                    self.model_idx = (self.model_idx + 1) % len(self.fallback_models)
-                    self.model_name = self.fallback_models[self.model_idx]
-                    logger.warning(f"Limit or Error Hit! Auto-switching to model: {self.model_name}...")
-                    time.sleep(2) # brief pause before jumping to next model
+                    # Attempt standard parse, fallback to repair
+                    try:
+                        json.loads(content)
+                        return content
+                    except json.JSONDecodeError:
+                        logger.warning("JSON decode failed. Attempting to repair via json-repair...")
+                        repaired = repair_json(content)
+                        if isinstance(repaired, str):
+                            json.loads(repaired) # verify repair
+                            return repaired
+                        elif isinstance(repaired, (dict, list)):
+                            return json.dumps(repaired)
+                        else:
+                            raise ValueError("Repair generated an invalid object.")
+                            
+                except TruncationError as e:
+                    logger.warning(f"Limit Hit on {model}: {e}. Switching model immediately.")
+                    break # Breaks the inner retry loop, moves to the next model in model_list
+                    
+                except Exception as e: # Catch Rate Limits, 502s, network drops
+                    error_str = str(e)
+                    logger.warning(f"Transient Error on {model} (Attempt {attempt+1}/{self.retries}): {error_str}")
+                    
+                    if "400" in error_str or "404" in error_str:
+                        logger.warning("Model endpoint invalid. Switching model immediately.")
+                        break # Break inner loop, move to next model
+                        
+                    time.sleep(self.retry_backoff * (attempt + 1))
                     continue
                     
-                import re
-                match = re.search(r'(?:try again in|retry in) ([\d.]+)s', error_str, re.IGNORECASE)
-                if match:
-                    wait_time = float(match.group(1)) + 2.0
-                    logger.warning(f"Rate limit hit. Sleeping {wait_time:.1f} seconds...")
-                    time.sleep(wait_time)
-                elif "429" in error_str or "rate_limit_exceeded" in error_str:
-                    logger.warning("Rate limit hit. Sleeping 30 seconds...")
-                    time.sleep(30)
-                else:
-                    time.sleep(5 * (attempt + 1))
-                    
-        raise Exception(f"All {retries} API attempts failed.")
+        logger.error("All fallback models exhausted or failed.")
+        raise RuntimeError("LLM generation failed across all configured models.")

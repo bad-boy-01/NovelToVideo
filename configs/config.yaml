@@ -29,5 +29,11 @@ tts:
   provider: kokoro
 
 llm:
-  provider: openrouter
-  model: meta-llama/llama-4-scout:free
+  primary_model: "google/gemini-2.5-flash"
+  fallback_models:
+    - "google/gemini-2.0-flash-lite-preview-02-05:free"
+    - "meta-llama/llama-3.3-70b-instruct:free"
+    - "nvidia/llama-3.1-nemotron-70b-instruct:free"
+  max_output_tokens: 8192
+  retries: 3
+  retry_backoff: 2.0
