@@ -31,7 +31,9 @@ tts:
 llm:
   primary_model: "google/gemini-2.5-flash"
   fallback_models:
-    - "meta-llama/llama-3.1-8b-instruct"
+    - "qwen/qwen-2.5-14b-instruct"
+    - "openai/gpt-4o-mini"
+    - "mistralai/mistral-small-3.1"
   max_output_tokens: 1800
   retries: 3
   retry_backoff: 2.0

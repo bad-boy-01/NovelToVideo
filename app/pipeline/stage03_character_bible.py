@@ -54,6 +54,10 @@ class Stage03CharacterBible:
                 "4. If 'fingerprint_confidence' < 0.9, set 'needs_review' to true and DO NOT overwrite their main fingerprint.\n"
                 "5. If a character experiences a time-skip or major appearance change in this chunk, ADD a new CharacterVersion to their 'versions' array.\n"
                 "6. If a completely new character appears in this chunk, CREATE a new entry for them.\n"
+                "CRITICAL OUTPUT CONTROL:\n"
+                "- STRICTLY return ONLY the JSON delta.\n"
+                "- DO NOT include explanations, markdown formatting, or any text outside the JSON.\n"
+                "- Maximum response length is strictly limited to prevent truncation.\n"
             )
             
             result_text = self.llm.generate_json(prompt, chunk_text)
