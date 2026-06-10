@@ -12,7 +12,7 @@ class LLMClient:
         self.provider = llm_config.get("provider", "openrouter").lower()
         
         self.fallback_models = [
-            "google/gemini-2.0-flash-exp:free",
+            "google/gemini-2.0-flash:free",
             "meta-llama/llama-3.3-70b-instruct:free",
             "mistralai/mistral-nemo:free"
         ]
