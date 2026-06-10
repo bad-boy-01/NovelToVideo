@@ -1,6 +1,7 @@
 import json
 import re
 from pathlib import Path
+from json_repair import repair_json
 from app.generators.llm_client import LLMClient
 from app.utils.logger import logger
 
@@ -13,11 +14,14 @@ class Stage03CharacterBible:
         self.llm = LLMClient()
         self.prompt_template_path = Path("prompts/bible_prompt.txt")
         
-    def _clean_json_response(self, text: str) -> dict:
-        """Strips markdown formatting if Gemini forgets to use strict JSON mode."""
+    def _clean_json_response(self, text: str):
+        """Strips markdown formatting and attempts repair if JSON is malformed."""
         cleaned = re.sub(r'```json\s*', '', text)
         cleaned = re.sub(r'```\s*', '', cleaned)
-        return json.loads(cleaned.strip())
+        try:
+            return json.loads(cleaned.strip())
+        except json.JSONDecodeError:
+            return repair_json(cleaned.strip(), return_dict=False) or {}
         
     def run(self):
         logger.info("Executing Stage 03: Character Registry Generation")
@@ -43,52 +47,65 @@ class Stage03CharacterBible:
             with open(chunk_file, "r", encoding="utf-8") as f:
                 chunk_text = f.read()
                 
-            prompt = (
-                base_prompt + "\n\n"
-                "Return a JSON dictionary where keys are character canonical names and values are the CharacterRegistryEntry objects.\n"
-                f"Current Registry State:\n{json.dumps(current_registry, indent=2)}\n\n"
-                "INSTRUCTIONS FOR INCREMENTAL DELTA:\n"
-                "1. ONLY output characters that are EITHER newly discovered in this chunk, OR existing characters whose physical descriptions/fingerprints need an update based on new details in this chunk.\n"
-                "2. DO NOT output characters from the 'Current Registry State' if they do not appear in this chunk or have no new descriptive details.\n"
-                "3. If a character already exists and requires an update, rate your confidence in this change via 'fingerprint_confidence' (0.0 to 1.0).\n"
-                "4. If 'fingerprint_confidence' < 0.9, set 'needs_review' to true and DO NOT overwrite their main fingerprint.\n"
-                "5. If a character experiences a time-skip or major appearance change in this chunk, ADD a new CharacterVersion to their 'versions' array.\n"
-                "6. If a completely new character appears in this chunk, CREATE a new entry for them.\n"
-                "CRITICAL OUTPUT CONTROL:\n"
-                "- STRICTLY return ONLY the JSON delta.\n"
-                "- DO NOT include explanations, markdown formatting, or any text outside the JSON.\n"
-                "- Maximum response length is strictly limited to prevent truncation.\n"
+            # PASS 1: Extract Names
+            logger.info(f"Pass 1: Extracting character names from {chunk_file.name}...")
+            pass1_prompt = (
+                "TASK:\n"
+                "List ONLY character names introduced or actively appearing in this chunk.\n"
+                "Rules:\n"
+                "- Return a JSON array of strings (e.g. [\"Name A\", \"Name B\"])\n"
+                "- No explanations. Max 10 names.\n"
             )
             
-            result_text = self.llm.generate_json(prompt, chunk_text)
+            p1_result = self.llm.generate_json(pass1_prompt, chunk_text)
             try:
-                updated_registry = self._clean_json_response(result_text)
+                names_list = self._clean_json_response(p1_result)
+                if not isinstance(names_list, list):
+                    names_list = list(names_list.values()) if isinstance(names_list, dict) else []
+            except Exception as e:
+                logger.error(f"Failed to parse Pass 1 output for {chunk_file.name}: {e}")
+                continue
                 
-                # Apply Confidence Lock & Merge Delta Locally
-                for char_id, entry in updated_registry.items():
-                    if char_id in current_registry:
-                        existing = current_registry[char_id]
-                        
-                        confidence = entry.get("fingerprint_confidence", 1.0)
-                        if confidence < 0.9:
-                            entry["needs_review"] = True
-                            entry["fingerprint"] = existing.get("fingerprint")
-                            
-                        # Safely merge versions
-                        old_versions = existing.get("versions", {})
-                        old_versions.update(entry.get("versions", {}))
-                        entry["versions"] = old_versions
-                        
-                        current_registry[char_id] = entry
-                    else:
-                        current_registry[char_id] = entry
-                
-                # Iteratively save progress
-                with open(self.registry_path, "w", encoding="utf-8") as f:
-                    json.dump(current_registry, f, indent=2)
+            # Deduplicate and limit
+            names_list = list(set([str(n) for n in names_list if n]))[:10]
+            logger.info(f"Found {len(names_list)} characters: {names_list}")
+            
+            # PASS 2: Enrich Each Character
+            for char_name in names_list:
+                # Cache skip logic: If already in registry, we skip enrichment to save API calls
+                if char_name in current_registry:
+                    logger.info(f"Skipping known character: {char_name}")
+                    continue
                     
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse Gemini output for {chunk_file.name}: {e}")
-                raise
+                logger.info(f"Pass 2: Enriching new character: {char_name}")
+                pass2_prompt = (
+                    base_prompt + "\n\n"
+                    f"TASK: Create a CharacterRegistryEntry ONLY for the character: {char_name}\n"
+                    "Rules:\n"
+                    "- ONLY base this on details found in the provided chunk.\n"
+                    "- Return strict JSON matching the CharacterRegistryEntry schema.\n"
+                    "- Do not include any other characters.\n"
+                    "- Ensure the output is under 1200 tokens.\n"
+                )
+                
+                p2_result = self.llm.generate_json(pass2_prompt, chunk_text)
+                try:
+                    entry = self._clean_json_response(p2_result)
+                    
+                    # Unwrap if LLM nested it under the character's name
+                    if isinstance(entry, dict) and char_name in entry:
+                        entry = entry[char_name]
+                    elif isinstance(entry, dict) and len(entry) == 1 and isinstance(list(entry.values())[0], dict):
+                        entry = list(entry.values())[0]
+                        
+                    # PASS 3: Local Merge
+                    current_registry[char_name] = entry
+                    
+                    # Iteratively save progress
+                    with open(self.registry_path, "w", encoding="utf-8") as f:
+                        json.dump(current_registry, f, indent=2)
+                        
+                except Exception as e:
+                    logger.error(f"Failed to parse Pass 2 output for {char_name}: {e}")
                 
         logger.info(f"Stage 03 Complete. Registry secured with {len(current_registry)} characters.")

@@ -31,19 +31,21 @@ class TestBibles(unittest.TestCase):
 
     @patch('app.pipeline.stage03_character_bible.LLMClient')
     def test_character_bible_generation(self, MockLLM):
-        # Mock LLM returns JSON
         mock_instance = MockLLM.return_value
-        mock_instance.generate_json.return_value = '''
-        {
-            "char_0001": {
-                "id": "char_0001",
-                "canonical_name": "Xu Changshou",
-                "aliases": ["Changshou"],
-                "fingerprint": {"hair": "black"},
-                "versions": []
+        mock_instance.generate_json.side_effect = [
+            '["Xu Changshou"]', # Pass 1
+            '''
+            {
+                "char_0001": {
+                    "id": "char_0001",
+                    "canonical_name": "Xu Changshou",
+                    "aliases": ["Changshou"],
+                    "fingerprint": {"hair": "black"},
+                    "versions": []
+                }
             }
-        }
-        '''
+            ''' # Pass 2
+        ]
         
         stage = Stage03CharacterBible(self.project_path)
         stage.run()
@@ -52,7 +54,7 @@ class TestBibles(unittest.TestCase):
         self.assertTrue(registry_path.exists())
         with open(registry_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            self.assertEqual(data["char_0001"]["canonical_name"], "Xu Changshou")
+            self.assertEqual(data["Xu Changshou"]["canonical_name"], "Xu Changshou")
 
     @patch('app.pipeline.stage04_world_bible.LLMClient')
     def test_world_bible_generation(self, MockLLM):
