@@ -93,6 +93,8 @@ class GeminiClient:
                 
                 if attempt == retries - 1:
                     raise
+
+        raise Exception(f"All {retries} API attempts failed across all fallback models.")
                 
                 import re
                 match = re.search(r'Please retry in ([\d.]+)s', error_str)
