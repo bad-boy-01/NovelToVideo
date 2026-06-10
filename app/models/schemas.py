@@ -127,6 +127,8 @@ class ProjectManifest(BaseModel):
     last_audio: Optional[int] = None
     
     # Cost Tracking
+    gemini_requests: int = 0
+    estimated_tokens: int = 0
     gemini_input_tokens: int = 0
     gemini_output_tokens: int = 0
     estimated_cost: float = 0.0

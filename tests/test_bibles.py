@@ -29,10 +29,10 @@ class TestBibles(unittest.TestCase):
     def tearDown(self):
         self.tmp_dir.cleanup()
 
-    @patch('app.pipeline.stage03_character_bible.GeminiClient')
-    def test_character_bible_generation(self, MockGemini):
-        # Mock Gemini returns JSON
-        mock_instance = MockGemini.return_value
+    @patch('app.pipeline.stage03_character_bible.LLMClient')
+    def test_character_bible_generation(self, MockLLM):
+        # Mock LLM returns JSON
+        mock_instance = MockLLM.return_value
         mock_instance.generate_json.return_value = '''
         {
             "char_0001": {
@@ -54,9 +54,9 @@ class TestBibles(unittest.TestCase):
             data = json.load(f)
             self.assertEqual(data["char_0001"]["canonical_name"], "Xu Changshou")
 
-    @patch('app.pipeline.stage04_world_bible.GeminiClient')
-    def test_world_bible_generation(self, MockGemini):
-        mock_instance = MockGemini.return_value
+    @patch('app.pipeline.stage04_world_bible.LLMClient')
+    def test_world_bible_generation(self, MockLLM):
+        mock_instance = MockLLM.return_value
         mock_instance.generate_json.return_value = '''
         {
             "Heavenly Sect": {
@@ -74,9 +74,9 @@ class TestBibles(unittest.TestCase):
             data = json.load(f)
             self.assertIn("Heavenly Sect", data)
 
-    @patch('app.pipeline.stage05_style_bible.GeminiClient')
-    def test_style_bible_generation(self, MockGemini):
-        mock_instance = MockGemini.return_value
+    @patch('app.pipeline.stage05_style_bible.LLMClient')
+    def test_style_bible_generation(self, MockLLM):
+        mock_instance = MockLLM.return_value
         mock_instance.generate_json.return_value = '''
         {
             "color_palette": "Muted and grim",
