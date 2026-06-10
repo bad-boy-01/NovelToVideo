@@ -12,9 +12,10 @@ class LLMClient:
         self.provider = llm_config.get("provider", "openrouter").lower()
         
         self.fallback_models = [
-            "qwen/qwen3-coder:free",
-            "openai/gpt-oss-20b:free",
-            "meta-llama/llama-3.3-70b-instruct:free"
+            "meta-llama/llama-4-scout:free",
+            "deepseek/deepseek-r1:free",
+            "qwen/qwen3-235b-a22b:free",
+            "google/gemma-3-27b-it:free"
         ]
         self.model_idx = 0
         self.model_name = llm_config.get("model", self.fallback_models[self.model_idx])

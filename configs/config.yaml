@@ -30,4 +30,4 @@ tts:
 
 llm:
   provider: openrouter
-  model: qwen/qwen3-coder:free
+  model: meta-llama/llama-4-scout:free
