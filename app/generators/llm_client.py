@@ -87,6 +87,10 @@ class LLMClient:
                 )
                 
                 content = response.choices[0].message.content
+                
+                if content is None:
+                    raise ValueError("The model returned a blank response due to rate limits.")
+                    
                 if content.startswith("```json"):
                     content = content[7:]
                 if content.endswith("```"):

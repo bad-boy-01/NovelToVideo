@@ -30,4 +30,4 @@ tts:
 
 llm:
   provider: openrouter
-  model: openrouter/free
+  model: google/gemma-3-27b-it:free
