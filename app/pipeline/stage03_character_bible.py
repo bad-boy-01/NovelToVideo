@@ -22,6 +22,14 @@ class Stage03CharacterBible:
             return json.loads(cleaned.strip())
         except json.JSONDecodeError:
             return repair_json(cleaned.strip(), return_dict=False) or {}
+            
+    def _extract_local_context(self, chunk_text: str, name: str) -> str:
+        """Slices the chunk down to sentences containing the character name to save tokens."""
+        sentences = re.split(r'(?<=[.!?]) +', chunk_text.replace('\n', ' '))
+        relevant = [s for s in sentences if name.lower() in s.lower()]
+        if not relevant:
+            return chunk_text[:2000]
+        return " ".join(relevant[:6])
         
     def run(self):
         logger.info("Executing Stage 03: Character Registry Generation")
@@ -78,17 +86,18 @@ class Stage03CharacterBible:
                     continue
                     
                 logger.info(f"Pass 2: Enriching new character: {char_name}")
+                context = self._extract_local_context(chunk_text, char_name)
                 pass2_prompt = (
                     base_prompt + "\n\n"
                     f"TASK: Create a CharacterRegistryEntry ONLY for the character: {char_name}\n"
                     "Rules:\n"
-                    "- ONLY base this on details found in the provided chunk.\n"
+                    "- ONLY base this on details found in the provided chunk excerpt.\n"
                     "- Return strict JSON matching the CharacterRegistryEntry schema.\n"
                     "- Do not include any other characters.\n"
                     "- Ensure the output is under 1200 tokens.\n"
                 )
                 
-                p2_result = self.llm.generate_json(pass2_prompt, chunk_text)
+                p2_result = self.llm.generate_json(pass2_prompt, context)
                 try:
                     entry = self._clean_json_response(p2_result)
                     
