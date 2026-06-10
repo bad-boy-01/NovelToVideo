@@ -10,7 +10,7 @@ class LLMClient:
         config = load_config()
         llm_config = config.get("llm", {})
         self.provider = llm_config.get("provider", "groq").lower()
-        self.model_name = llm_config.get("model", "llama-3.3-70b-versatile")
+        self.model_name = llm_config.get("model", "llama-3.1-8b-instant")
         
         if self.provider == "groq":
             api_key = os.environ.get("GROQ_API_KEY")
