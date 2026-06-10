@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from app.generators.gemini_client import GeminiClient
+from app.generators.llm_client import LLMClient
 from app.utils.logger import logger
 
 class Stage05StyleBible:
@@ -10,7 +10,7 @@ class Stage05StyleBible:
         self.chunks_dir = project_path / "chunks"
         self.memory_dir = project_path / "memory"
         self.style_bible_path = self.memory_dir / "style_bible.json"
-        self.gemini = GeminiClient()
+        self.llm = LLMClient()
         
     def _clean_json_response(self, text: str) -> dict:
         cleaned = re.sub(r'```json\s*', '', text)
@@ -40,7 +40,7 @@ class Stage05StyleBible:
             "- 'overall_mood': 1-2 sentences summarizing the visual atmosphere."
         )
         
-        result_text = self.gemini.generate_json(prompt, chunk_text)
+        result_text = self.llm.generate_json(prompt, chunk_text)
         try:
             style_data = self._clean_json_response(result_text)
             with open(self.style_bible_path, "w", encoding="utf-8") as f:

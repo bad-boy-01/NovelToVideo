@@ -1,12 +1,12 @@
 from pathlib import Path
 from app.utils.logger import logger
-from app.generators.gemini_client import GeminiClient
+from app.generators.llm_client import LLMClient
 
 class Stage15SEOGen:
     def __init__(self, project_path: Path):
         self.project_path = project_path
         self.youtube_dir = project_path / "youtube"
-        self.gemini = GeminiClient()
+        self.llm = LLMClient()
         
     def run(self):
         logger.info("Executing Stage 15: SEO Metadata Generation")

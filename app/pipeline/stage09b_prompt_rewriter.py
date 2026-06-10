@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from app.generators.gemini_client import GeminiClient
+from app.generators.llm_client import LLMClient
 from app.utils.logger import logger
 
 class Stage09bPromptRewriter:
@@ -8,7 +8,7 @@ class Stage09bPromptRewriter:
         self.project_path = project_path
         self.scenes_dir = project_path / "scenes"
         self.failed_dir = project_path / "failed_images"
-        self.gemini = GeminiClient()
+        self.llm = LLMClient()
         
     def run(self):
         logger.info("Executing Stage 09b: Prompt Rewriter for Failed Images")

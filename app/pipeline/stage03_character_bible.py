@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from app.generators.gemini_client import GeminiClient
+from app.generators.llm_client import LLMClient
 from app.utils.logger import logger
 
 class Stage03CharacterBible:
@@ -10,7 +10,7 @@ class Stage03CharacterBible:
         self.chunks_dir = project_path / "chunks"
         self.memory_dir = project_path / "memory"
         self.registry_path = self.memory_dir / "character_registry.json"
-        self.gemini = GeminiClient()
+        self.llm = LLMClient()
         self.prompt_template_path = Path("prompts/bible_prompt.txt")
         
     def _clean_json_response(self, text: str) -> dict:
@@ -55,7 +55,7 @@ class Stage03CharacterBible:
                 "5. Make sure to return the full, merged registry including all previous characters, even if they didn't appear in this chunk."
             )
             
-            result_text = self.gemini.generate_json(prompt, chunk_text)
+            result_text = self.llm.generate_json(prompt, chunk_text)
             try:
                 updated_registry = self._clean_json_response(result_text)
                 

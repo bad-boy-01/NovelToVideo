@@ -1,42 +1,40 @@
-import google.generativeai as genai
 import os
 import time
+import json
+from openai import OpenAI
 from app.utils.config import load_config
 from app.utils.logger import logger
 
-class GeminiClient:
+class LLMClient:
     def __init__(self):
         config = load_config()
-        primary_model = config.get("gemini", {}).get("model", "gemini-1.5-flash")
+        llm_config = config.get("llm", {})
+        self.provider = llm_config.get("provider", "groq").lower()
+        self.model_name = llm_config.get("model", "llama-3.3-70b-versatile")
         
-        self.fallback_models = [
-            primary_model,
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-exp",
-            "gemini-1.5-flash-002",
-            "gemini-1.5-pro",
-            "gemini-2.5-flash"
-        ]
-        self.fallback_models = list(dict.fromkeys(self.fallback_models))
-        self.current_model_idx = 0
-        self.model_name = self.fallback_models[self.current_model_idx]
-        
-        api_key = os.environ.get("GEMINI_API_KEY")
+        if self.provider == "groq":
+            api_key = os.environ.get("GROQ_API_KEY")
+            base_url = "https://api.groq.com/openai/v1"
+        elif self.provider == "openrouter":
+            api_key = os.environ.get("OPENROUTER_API_KEY")
+            base_url = "https://openrouter.ai/api/v1"
+        else: # default openai
+            api_key = os.environ.get("OPENAI_API_KEY")
+            base_url = "https://api.openai.com/v1"
+
         if not api_key:
-            logger.warning("GEMINI_API_KEY environment variable is not set. API calls will fail.")
+            logger.warning(f"{self.provider.upper()}_API_KEY environment variable is not set. API calls will fail.")
             
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(self.model_name)
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         
     def generate_json(self, prompt: str, text: str, retries: int = 5) -> str:
         """
-        Calls Gemini to generate a JSON output based on the provided prompt and text.
+        Calls the LLM to generate a JSON output based on the provided prompt and text.
         Includes exponential backoff for rate limits.
         """
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
+        if not os.environ.get(f"{self.provider.upper()}_API_KEY"):
             import json
-            logger.warning("MOCK MODE: Returning mathematical dummy JSON to bypass validators.")
+            logger.warning("MOCK MODE: Returning dummy JSON to bypass validators.")
             if "Character" in prompt or "CharacterRegistryEntry" in prompt or "Registry" in prompt:
                 return '{"Xu Changshou": {"aliases": ["Changshou"], "canonical_name": "Xu Changshou", "fingerprint": "black hair, black coat", "versions": {}, "fingerprint_confidence": 0.95, "needs_review": false}}'
             if "World" in prompt or "locations" in prompt:
@@ -49,6 +47,7 @@ class GeminiClient:
                 # Ensure we generate ~45 words per scene to bypass Density Validators
                 chunk_len = len(words) // 4
                 for i in range(4):
+                    if chunk_len == 0: break
                     narration = " ".join(words[i*chunk_len:(i+1)*chunk_len])
                     scenes.append({
                         "scene_id": i+1,
@@ -70,40 +69,40 @@ class GeminiClient:
         
         for attempt in range(retries):
             try:
-                response = self.model.generate_content(
-                    full_prompt,
-                    generation_config=genai.GenerationConfig(
-                        response_mime_type="application/json",
-                        temperature=0.1 # Enforce highly deterministic extraction
-                    )
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": "You are a precise data extraction system. You must output raw, valid JSON only. Do not wrap in markdown blocks like ```json."},
+                        {"role": "user", "content": full_prompt}
+                    ],
+                    temperature=0.1,
+                    response_format={"type": "json_object"}
                 )
-                return response.text
+                
+                content = response.choices[0].message.content
+                if content.startswith("```json"):
+                    content = content[7:]
+                if content.endswith("```"):
+                    content = content[:-3]
+                return content.strip()
+                
             except Exception as e:
                 error_str = str(e)
-                logger.error(f"Gemini API Error (Model: {self.model_name}, Attempt {attempt+1}/{retries}): {error_str}")
-                
-                # Auto-healing router for missing models or daily hard limits
-                if "404" in error_str or "not found" in error_str or ("429" in error_str and ("limit: 20" in error_str or "limit: 0" in error_str)) or "Invalid argument: response_mime_type" in error_str:
-                    self.current_model_idx += 1
-                    if self.current_model_idx < len(self.fallback_models):
-                        self.model_name = self.fallback_models[self.current_model_idx]
-                        self.model = genai.GenerativeModel(self.model_name)
-                        logger.warning(f"Auto-switching to fallback model: {self.model_name}")
-                        continue
+                logger.error(f"LLM API Error (Model: {self.model_name}, Attempt {attempt+1}/{retries}): {error_str}")
                 
                 if attempt == retries - 1:
                     raise
-
-        raise Exception(f"All {retries} API attempts failed across all fallback models.")
-                
+                    
                 import re
-                match = re.search(r'Please retry in ([\d.]+)s', error_str)
+                match = re.search(r'(?:try again in|retry in) ([\d.]+)s', error_str, re.IGNORECASE)
                 if match:
                     wait_time = float(match.group(1)) + 2.0
                     logger.warning(f"Rate limit hit. Sleeping {wait_time:.1f} seconds...")
                     time.sleep(wait_time)
-                elif "429" in error_str or "Quota exceeded" in error_str:
-                    logger.warning("Rate limit hit. Sleeping 60 seconds...")
-                    time.sleep(60)
+                elif "429" in error_str or "rate_limit_exceeded" in error_str:
+                    logger.warning("Rate limit hit. Sleeping 30 seconds...")
+                    time.sleep(30)
                 else:
-                    time.sleep(10 * (attempt + 1))
+                    time.sleep(5 * (attempt + 1))
+                    
+        raise Exception(f"All {retries} API attempts failed.")

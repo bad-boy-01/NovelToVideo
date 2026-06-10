@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from app.generators.gemini_client import GeminiClient
+from app.generators.llm_client import LLMClient
 from app.utils.logger import logger
 
 class Stage07aSceneExtractor:
@@ -9,7 +9,7 @@ class Stage07aSceneExtractor:
         self.project_path = project_path
         self.chunks_dir = project_path / "chunks"
         self.scenes_dir = project_path / "scenes"
-        self.gemini = GeminiClient()
+        self.llm = LLMClient()
         
     def _clean_json_response(self, text: str) -> list:
         cleaned = re.sub(r'```json\s*', '', text)
@@ -35,7 +35,7 @@ class Stage07aSceneExtractor:
             )
             
             try:
-                result_text = self.gemini.generate_json(prompt, chunk_text)
+                result_text = self.llm.generate_json(prompt, chunk_text)
                 scenes = self._clean_json_response(result_text)
                 
                 chunk_id = chunk_file.stem.split("_")[1]

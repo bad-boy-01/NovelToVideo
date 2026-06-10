@@ -28,5 +28,6 @@ video:
 tts:
   provider: kokoro
 
-gemini:
-  model: gemini-1.5-flash
+llm:
+  provider: groq
+  model: llama-3.3-70b-versatile

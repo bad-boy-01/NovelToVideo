@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from app.generators.gemini_client import GeminiClient
+from app.generators.llm_client import LLMClient
 from app.utils.logger import logger
 
 class Stage10SceneVerifier:
@@ -9,7 +9,7 @@ class Stage10SceneVerifier:
         self.scenes_dir = project_path / "scenes"
         self.images_dir = project_path / "images"
         self.failed_dir = project_path / "failed_images"
-        self.gemini = GeminiClient()
+        self.llm = LLMClient()
         
     def run(self):
         logger.info("Executing Stage 10: Gemini Visual Verification")
@@ -27,7 +27,7 @@ class Stage10SceneVerifier:
                 continue
                 
             # Stub: Send base64 image and prompt to Gemini Vision
-            # result = self.gemini.verify_image(image_file, scene["image_prompt"])
+            # result = self.llm.verify_image(image_file, scene["image_prompt"])
             # if result.score < 7:
             #     logger.warning(f"Verification Failed for Scene {scene_id}. Deleting image and queueing fallback.")
             #     image_file.unlink()

@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from app.generators.gemini_client import GeminiClient
+from app.generators.llm_client import LLMClient
 from app.utils.logger import logger
 
 class Stage04WorldBible:
@@ -10,7 +10,7 @@ class Stage04WorldBible:
         self.chunks_dir = project_path / "chunks"
         self.memory_dir = project_path / "memory"
         self.world_bible_path = self.memory_dir / "world_bible.json"
-        self.gemini = GeminiClient()
+        self.llm = LLMClient()
         
     def _clean_json_response(self, text: str) -> dict:
         cleaned = re.sub(r'```json\s*', '', text)
@@ -42,7 +42,7 @@ class Stage04WorldBible:
                 "Update the world state with any new locations or concepts found in this chunk. Retain all old concepts exactly as they are."
             )
             
-            result_text = self.gemini.generate_json(prompt, chunk_text)
+            result_text = self.llm.generate_json(prompt, chunk_text)
             try:
                 current_world = self._clean_json_response(result_text)
                 with open(self.world_bible_path, "w", encoding="utf-8") as f:
