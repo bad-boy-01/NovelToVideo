@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.pytest_cache/
+.coverage
+htmlcov/
+
+# NovelToVideo Specific
+projects/
+global_memory/
+memory/
+failed_images/
+scenes/
+chunks/
+images/
+audio/
+subtitles/
+youtube/
+timeline.json
+report.json
+
+# IDEs
+.idea/
+.vscode/
+.gemini/

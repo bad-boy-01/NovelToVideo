@@ -1,0 +1,32 @@
+# NovelToVideo Configuration
+
+image_profiles:
+  kaggle_t4:
+    primary: sdxl
+    fallback_1: juggernautxl
+  kaggle_l4:
+    primary: flux-dev
+    fallback_1: sdxl
+  local_24gb:
+    primary: flux-dev
+    fallback_1: sdxl
+    fallback_2: juggernautxl
+
+image_size:
+  width: 1280
+  height: 720
+
+batch_size: 1
+
+max_vram_usage: auto
+
+save_every_image: true
+
+video:
+  fps: 30
+
+tts:
+  provider: kokoro
+
+gemini:
+  model: gemini-2.5-flash
