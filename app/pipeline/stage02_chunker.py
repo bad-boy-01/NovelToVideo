@@ -6,7 +6,7 @@ from app.models.schemas import ChunkManifest, ChunkManifestEntry, ChunkSummary
 from app.utils.logger import logger
 
 class SmartChunker:
-    def __init__(self, target_words: int = 7000, max_words: int = 10000):
+    def __init__(self, target_words: int = 4000, max_words: int = 5000):
         self.target_words = target_words
         self.max_words = max_words
 
