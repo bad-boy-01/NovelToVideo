@@ -12,9 +12,9 @@ class LLMClient:
         self.provider = llm_config.get("provider", "openrouter").lower()
         
         self.fallback_models = [
-            "openrouter/free",
-            "google/gemma-3-27b-it:free",
-            "deepseek/deepseek-chat-v3-0324:free"
+            "qwen/qwen3-coder:free",
+            "openai/gpt-oss-20b:free",
+            "meta-llama/llama-3.3-70b-instruct:free"
         ]
         self.model_idx = 0
         self.model_name = llm_config.get("model", self.fallback_models[self.model_idx])
@@ -82,7 +82,6 @@ class LLMClient:
                         {"role": "user", "content": full_prompt}
                     ],
                     temperature=0.1,
-                    max_tokens=1500,
                     response_format={"type": "json_object"}
                 )
                 
@@ -95,7 +94,17 @@ class LLMClient:
                     content = content[7:]
                 if content.endswith("```"):
                     content = content[:-3]
-                return content.strip()
+                    
+                content = content.strip()
+                
+                # Verify JSON is complete before returning
+                import json
+                try:
+                    json.loads(content)
+                except json.JSONDecodeError:
+                    raise ValueError("The model generated incomplete JSON (truncated response).")
+                    
+                return content
                 
             except Exception as e:
                 error_str = str(e)
