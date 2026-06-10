@@ -21,6 +21,7 @@ class Stage03CharacterBible:
         
     def run(self):
         logger.info("Executing Stage 03: Character Registry Generation")
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
         
         if not self.prompt_template_path.exists():
             raise FileNotFoundError("Missing bible_prompt.txt")

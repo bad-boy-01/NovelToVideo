@@ -19,6 +19,7 @@ class Stage04WorldBible:
         
     def run(self):
         logger.info("Executing Stage 04: World Bible Generation")
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
         
         chunk_files = sorted(list(self.chunks_dir.glob("chunk_*.txt")))
         if not chunk_files:

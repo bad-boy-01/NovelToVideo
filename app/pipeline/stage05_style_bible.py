@@ -19,6 +19,7 @@ class Stage05StyleBible:
         
     def run(self):
         logger.info("Executing Stage 05: Style Bible Generation")
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
         
         chunk_files = sorted(list(self.chunks_dir.glob("chunk_*.txt")))
         if not chunk_files:
